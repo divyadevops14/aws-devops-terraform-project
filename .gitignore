@@ -34,3 +34,4 @@ Thumbs.db
 
 # Scripts output
 *.log
+.claude/
