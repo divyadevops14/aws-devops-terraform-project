@@ -8,8 +8,8 @@ kubernetes_version = "1.30"
 
 # Restrict to your own IP to avoid exposing the EKS API publicly
 # Find your IP: curl -s https://checkip.amazonaws.com
-developer_cidrs = ["YOUR_PUBLIC_IP/32"]
+developer_cidrs = ["152.57.189.85/32"]
 
 db_name     = "devdb"
 db_username = "devuser"
-db_password = "ChangeMe123!"
+db_password = "Mira@1405"
