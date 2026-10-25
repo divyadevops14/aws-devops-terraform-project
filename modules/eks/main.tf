@@ -2,7 +2,7 @@
 # EKS MODULE — Production-ready Kubernetes cluster
 # =============================================================================
 # Features:
-#   - Kubernetes 1.30 (latest stable)
+#   - Kubernetes 1.36 (latest stable)
 #   - Private API endpoint (no public API exposure in prod)
 #   - KMS encryption for Kubernetes secrets
 #   - CloudWatch control-plane logging

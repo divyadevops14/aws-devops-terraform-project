@@ -4,7 +4,7 @@
 aws_region   = "us-east-1"
 project_name = "mycompany"
 
-kubernetes_version = "1.30"
+kubernetes_version = "1.36"
 
 # Restrict to your own IP to avoid exposing the EKS API publicly
 # Find your IP: curl -s https://checkip.amazonaws.com
