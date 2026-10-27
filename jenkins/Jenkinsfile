@@ -16,16 +16,12 @@
 //   - AnsiColor
 //   - Slack Notification (optional)
 // =============================================================================
+// =============================================================================
+// TERRAFORM CI/CD PIPELINE - WINDOWS JENKINS
+// =============================================================================
 
 pipeline {
-    agent {
-        // Use a Docker agent with Terraform pre-installed to avoid
-        // polluting the Jenkins master with tool versions.
-        docker {
-            image 'hashicorp/terraform:1.6.6'
-            args  '--entrypoint=""'
-        }
-    }
+    agent any
 
     parameters {
         choice(
@@ -33,264 +29,202 @@ pipeline {
             choices: ['dev', 'stage', 'prod'],
             description: 'Target environment'
         )
+
         booleanParam(
             name: 'DESTROY',
             defaultValue: false,
-            description: 'Run terraform destroy instead of apply. Use with extreme caution.'
+            description: 'Generate a Terraform destroy plan'
         )
+
         booleanParam(
             name: 'PLAN_ONLY',
             defaultValue: true,
-            description: 'Safety mode: create a Terraform plan only; do not apply or destroy AWS resources.'
+            description: 'Plan only; do not apply or destroy resources'
         )
     }
 
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
-        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
-        AWS_DEFAULT_REGION    = 'us-east-1'
-        TF_VAR_db_password    = credentials('TF_VAR_db_password')
-        TF_IN_AUTOMATION      = 'true'  // disables interactive prompts
-        TF_CLI_ARGS           = '-no-color'
-        WORKING_DIR           = "environments/${params.ENVIRONMENT}"
+        AWS_DEFAULT_REGION = 'us-east-1'
+        TF_IN_AUTOMATION   = 'true'
+        TF_CLI_ARGS        = '-no-color'
+        WORKING_DIR        = "environments/${params.ENVIRONMENT}"
     }
 
     options {
-        ansiColor('xterm')
         buildDiscarder(logRotator(numToKeepStr: '20'))
         timeout(time: 60, unit: 'MINUTES')
-        disableConcurrentBuilds()  // prevent parallel runs on the same env
+        disableConcurrentBuilds()
     }
 
     stages {
-        // ---------------------------------------------------------------
         stage('Checkout') {
-        // ---------------------------------------------------------------
             steps {
                 checkout scm
-                sh 'terraform version'
+                bat '"C:\\terraform\\terraform.exe" version'
             }
         }
 
-        // ---------------------------------------------------------------
-        /*stage('Bootstrap Backend') {
-        // ---------------------------------------------------------------
-        // Creates the S3 bucket, DynamoDB table, and KMS key that all
-        // environment backends depend on.  Runs terraform apply in the
-        // backend/ directory using a state file persisted on the Jenkins
-        // host at /var/lib/jenkins/tf-backend-state so subsequent builds
-        // are a no-op when the bucket already exists.
-            steps {
-                dir('backend') {
-                    sh '''
-                        # Store state inside the workspace (Jenkins user already owns it).
-                        # cleanWs() is configured to exclude this directory so it persists
-                        # across builds, making every run after the first a no-op.
-                        STATE_DIR="${WORKSPACE}/.terraform-backend-state"
-                        mkdir -p "$STATE_DIR"
-
-                        # Restore state from previous run
-                        if [ -f "$STATE_DIR/terraform.tfstate" ]; then
-                            cp "$STATE_DIR/terraform.tfstate" .
-                        fi
-
-                        terraform init
-
-                        # If state is empty, import any resources that already exist in AWS.
-                        # This handles the case where state was lost mid-run (e.g. first run
-                        # crashed before the state file could be saved).
-                        if ! terraform state list 2>/dev/null | grep -q "aws_s3_bucket.terraform_state"; then
-                            echo "=== State empty — importing any existing resources ==="
-                            TF_VARS="-var=aws_account_id=131696162455"
-                            BUCKET="mycompany-terraform-state-131696162455"
-
-                            terraform import $TF_VARS aws_s3_bucket.terraform_state                                    $BUCKET 2>/dev/null || true
-                            terraform import $TF_VARS aws_s3_bucket_versioning.terraform_state                         $BUCKET 2>/dev/null || true
-                            terraform import $TF_VARS aws_s3_bucket_server_side_encryption_configuration.terraform_state $BUCKET 2>/dev/null || true
-                            terraform import $TF_VARS aws_s3_bucket_public_access_block.terraform_state                $BUCKET 2>/dev/null || true
-                            terraform import $TF_VARS aws_s3_bucket_logging.terraform_state                            $BUCKET 2>/dev/null || true
-                            terraform import $TF_VARS aws_dynamodb_table.terraform_state_lock                          mycompany-terraform-state-lock 2>/dev/null || true
-                            terraform import $TF_VARS aws_kms_alias.terraform_state                                    alias/mycompany-terraform-state 2>/dev/null || true
-
-                            # Derive the KMS key ID from the imported alias, then import the key
-                            KMS_KEY_ID=$(terraform state show aws_kms_alias.terraform_state 2>/dev/null | grep 'target_key_id' | awk -F'"' '{print $2}')
-                            if [ -n "$KMS_KEY_ID" ]; then
-                                terraform import $TF_VARS aws_kms_key.terraform_state "$KMS_KEY_ID" 2>/dev/null || true
-                            fi
-                        fi
-
-                        terraform apply \
-                            -auto-approve \
-                            -input=false \
-                            -var="aws_account_id=131696162455"
-
-                        # Persist state for the next build
-                        cp terraform.tfstate "$STATE_DIR/"
-                    '''
-                }
-            }
-        }
-*/
-        // ---------------------------------------------------------------
         stage('Terraform Format Check') {
-        // ---------------------------------------------------------------
             steps {
-                dir(env.WORKING_DIR) {
-                    sh '''
-                        echo "=== Checking Terraform formatting ==="
-                        terraform fmt -check -recursive -diff ../../
-                    '''
-                }
+                bat '"C:\\terraform\\terraform.exe" fmt -check -recursive -diff .'
             }
         }
 
-        // ---------------------------------------------------------------
         stage('Terraform Validate') {
-        // ---------------------------------------------------------------
             steps {
                 dir(env.WORKING_DIR) {
-                    sh '''
-                        echo "=== Validating Terraform configuration ==="
-                        terraform init -backend=false
-                        terraform validate
-                    '''
+                    bat '"C:\\terraform\\terraform.exe" init -backend=false -input=false'
+                    bat '"C:\\terraform\\terraform.exe" validate'
                 }
             }
         }
 
-        // ---------------------------------------------------------------
         stage('Terraform Init') {
-        // ---------------------------------------------------------------
             steps {
                 dir(env.WORKING_DIR) {
-                    sh '''
-                        echo "=== Initialising Terraform with remote backend ==="
-                        terraform init \
-                            -input=false \
-                            -reconfigure
-                    '''
-                }
-            }
-        }
-
-        // ---------------------------------------------------------------
-        stage('Terraform Plan') {
-        // ---------------------------------------------------------------
-            steps {
-                dir(env.WORKING_DIR) {
-                    script {
-                        def planCmd = params.DESTROY \
-                            ? 'terraform plan -destroy -out=tfplan -input=false' \
-                            : 'terraform plan -out=tfplan -input=false'
-
-                        sh """
-                            echo "=== Generating Terraform plan for ${params.ENVIRONMENT} ==="
-                            ${planCmd}
-                            terraform show -no-color tfplan > tfplan.txt
-                        """
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'aws-creds',
+                            usernameVariable: 'AWS_ACCESS_KEY_ID',
+                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                        )
+                    ]) {
+                        bat '"C:\\terraform\\terraform.exe" init -input=false -reconfigure'
                     }
                 }
             }
-            post {
-                always {
-                    // Archive plan as a build artifact for audit trail
-                    archiveArtifacts artifacts: "${env.WORKING_DIR}/tfplan.txt",
-                                     fingerprint: true
-                }
-            }
         }
 
-        // ---------------------------------------------------------------
-        stage('Plan Review') {
-        // ---------------------------------------------------------------
-            // Show the plan in the Jenkins console so approvers can read it
+        stage('Terraform Plan') {
             steps {
                 dir(env.WORKING_DIR) {
-                    sh 'cat tfplan.txt'
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'aws-creds',
+                            usernameVariable: 'AWS_ACCESS_KEY_ID',
+                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                        )
+                    ]) {
+                        script {
+                            if (params.DESTROY) {
+                                bat '"C:\\terraform\\terraform.exe" plan -destroy -input=false -out=tfplan'
+                            } else {
+                                bat '"C:\\terraform\\terraform.exe" plan -input=false -out=tfplan'
+                            }
+                        }
+
+                        bat '"C:\\terraform\\terraform.exe" show -no-color tfplan > tfplan.txt'
+                    }
                 }
             }
-        }
 
-        // ---------------------------------------------------------------
-        stage('Manual Approval') {
-        // ---------------------------------------------------------------
-            // Only block for manual approval on stage and prod.
-            // Dev can auto-apply to keep the feedback loop fast.
-            when {
-                expression {
-                    params.PLAN_ONLY == false &&
-                    (
-                        params.ENVIRONMENT == 'prod' ||
-                        params.ENVIRONMENT == 'stage' ||
-                        params.DESTROY == true
+            post {
+                success {
+                    archiveArtifacts(
+                        artifacts: "${env.WORKING_DIR}/tfplan.txt",
+                        fingerprint: true
                     )
                 }
             }
+        }
+
+        stage('Plan Review') {
             steps {
-                script {
-                    def actionLabel = params.DESTROY ? 'DESTROY' : 'APPLY'
-                    def approvalMsg = """
-                        🚨 Approval required to ${actionLabel} on *${params.ENVIRONMENT}*.
-                        Review the plan artifact before approving.
-                        Build: ${env.BUILD_URL}
-                    """.stripIndent()
+                dir(env.WORKING_DIR) {
+                    bat 'type tfplan.txt'
+                }
+            }
+        }
 
-                    // Optional: send Slack notification
-                    // slackSend(message: approvalMsg, color: 'warning')
+        stage('Manual Approval') {
+            when {
+                expression {
+                    !params.PLAN_ONLY &&
+                    (
+                        params.ENVIRONMENT == 'stage' ||
+                        params.ENVIRONMENT == 'prod' ||
+                        params.DESTROY
+                    )
+                }
+            }
 
-                    timeout(time: 30, unit: 'MINUTES') {
-                        input(
-                            message: "Approve Terraform ${actionLabel} on ${params.ENVIRONMENT}?",
-                            ok: "Approve ${actionLabel}"
+            steps {
+                timeout(time: 30, unit: 'MINUTES') {
+                    input(
+                        message: "Approve Terraform ${params.DESTROY ? 'DESTROY' : 'APPLY'} for ${params.ENVIRONMENT}?",
+                        ok: 'Approve'
+                    )
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            when {
+                expression {
+                    !params.PLAN_ONLY && !params.DESTROY
+                }
+            }
+
+            steps {
+                dir(env.WORKING_DIR) {
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'aws-creds',
+                            usernameVariable: 'AWS_ACCESS_KEY_ID',
+                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                         )
+                    ]) {
+                        bat '"C:\\terraform\\terraform.exe" apply -input=false -auto-approve tfplan'
                     }
                 }
             }
         }
 
-        // ---------------------------------------------------------------
-        stage('Terraform Apply') {
-        // ---------------------------------------------------------------
-            when {
-                expression { params.DESTROY == false && params.PLAN_ONLY == false }
-            }
-            steps {
-                dir(env.WORKING_DIR) {
-                    sh '''
-                        echo "=== Applying Terraform changes to ${ENVIRONMENT} ==="
-                        terraform apply -input=false -auto-approve tfplan
-                    '''
-                }
-            }
-        }
-
-        // ---------------------------------------------------------------
         stage('Terraform Destroy') {
-        // ---------------------------------------------------------------
             when {
-                expression { params.DESTROY == true && params.PLAN_ONLY == false }
+                expression {
+                    !params.PLAN_ONLY && params.DESTROY
+                }
             }
+
             steps {
                 dir(env.WORKING_DIR) {
-                    sh '''
-                        echo "=== DESTROYING ${ENVIRONMENT} environment ==="
-                        terraform apply -destroy -input=false -auto-approve tfplan
-                    '''
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'aws-creds',
+                            usernameVariable: 'AWS_ACCESS_KEY_ID',
+                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                        )
+                    ]) {
+                        bat '"C:\\terraform\\terraform.exe" apply -destroy -input=false -auto-approve tfplan'
+                    }
                 }
             }
         }
 
-        // ---------------------------------------------------------------
         stage('Post-Apply Outputs') {
-        // ---------------------------------------------------------------
             when {
-                expression { params.DESTROY == false && params.PLAN_ONLY == false }
+                expression {
+                    !params.PLAN_ONLY && !params.DESTROY
+                }
             }
+
             steps {
                 dir(env.WORKING_DIR) {
-                    sh 'terraform output -json > terraform-outputs.json'
-                    archiveArtifacts artifacts: 'terraform-outputs.json',
-                                     fingerprint: true
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'aws-creds',
+                            usernameVariable: 'AWS_ACCESS_KEY_ID',
+                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                        )
+                    ]) {
+                        bat '"C:\\terraform\\terraform.exe" output -json > terraform-outputs.json'
+
+                        archiveArtifacts(
+                            artifacts: 'terraform-outputs.json',
+                            fingerprint: true
+                        )
+                    }
                 }
             }
         }
@@ -298,20 +232,25 @@ pipeline {
 
     post {
         success {
-            echo "✅ Terraform pipeline completed successfully for ${params.ENVIRONMENT}"
-            // slackSend(message: "✅ Terraform ${params.ENVIRONMENT} succeeded.", color: 'good')
+            echo "Terraform pipeline completed successfully for ${params.ENVIRONMENT}"
         }
+
         failure {
-            echo "❌ Terraform pipeline failed for ${params.ENVIRONMENT}"
-            // slackSend(message: "❌ Terraform ${params.ENVIRONMENT} FAILED.", color: 'danger')
+            echo "Terraform pipeline failed for ${params.ENVIRONMENT}"
         }
+
         always {
-            // Clean up plan files — they may contain sensitive values
-            dir(env.WORKING_DIR) {
-                sh 'rm -f tfplan tfplan.txt'
+            script {
+                if (fileExists("${env.WORKING_DIR}/tfplan")) {
+                    bat "del /f /q \"${env.WORKING_DIR}\\tfplan\""
+                }
+
+                if (fileExists("${env.WORKING_DIR}/tfplan.txt")) {
+                    bat "del /f /q \"${env.WORKING_DIR}\\tfplan.txt\""
+                }
             }
-            // Exclude the backend state directory so it persists across builds
-            cleanWs(patterns: [[pattern: '.terraform-backend-state/**', type: 'EXCLUDE']])
+
+            cleanWs()
         }
     }
 }
