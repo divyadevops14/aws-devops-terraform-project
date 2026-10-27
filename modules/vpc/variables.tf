@@ -49,3 +49,8 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+variable "single_nat_gateway" {
+  description = "Use one NAT Gateway for all private subnets to reduce development costs"
+  type        = bool
+  default     = false
+}

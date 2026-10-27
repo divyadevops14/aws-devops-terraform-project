@@ -12,8 +12,8 @@ resource "aws_eks_node_group" "this" {
   node_role_arn   = var.node_role_arn
   subnet_ids      = var.subnet_ids
 
-  ami_type       = var.ami_type      # AL2_x86_64 | AL2_ARM_64 | BOTTLEROCKET_x86_64
-  capacity_type  = var.capacity_type # ON_DEMAND | SPOT
+  ami_type       = "AL2023_x86_64_STANDARD" # AL2_x86_64 | AL2_ARM_64 | BOTTLEROCKET_x86_64  
+  capacity_type  = var.capacity_type        # ON_DEMAND | SPOT
   instance_types = var.instance_types
   disk_size      = var.disk_size
 

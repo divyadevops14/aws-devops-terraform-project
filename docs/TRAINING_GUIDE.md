@@ -423,10 +423,10 @@ This is the most intelligent stage. It:
 # The idempotency check
 if ! terraform state list | grep -q "aws_s3_bucket.terraform_state"; then
     # Import each existing resource
-    terraform import ... aws_s3_bucket.terraform_state mycompany-terraform-state-169588426347
+    terraform import ... aws_s3_bucket.terraform_state mycompany-terraform-state-131696162455
     # ... import others
 fi
-terraform apply -auto-approve -var="aws_account_id=169588426347"
+terraform apply -auto-approve -var="aws_account_id=131696162455"
 ```
 
 **Stage 3: Terraform Format Check**
@@ -516,7 +516,7 @@ Person B tries to run terraform apply at the same time
 ### Our Remote State Setup
 
 ```
-S3 Bucket: mycompany-terraform-state-169588426347
+S3 Bucket: mycompany-terraform-state-131696162455
     ├── dev/terraform.tfstate       ← dev environment state
     ├── stage/terraform.tfstate     ← stage environment state
     └── prod/terraform.tfstate      ← prod environment state
@@ -681,7 +681,7 @@ After a successful `dev` apply, these resources exist in your AWS account:
 ### Remote State (Backend)
 | Resource | Name | Details |
 |----------|------|---------|
-| S3 Bucket | mycompany-terraform-state-169588426347 | Versioned, KMS encrypted |
+| S3 Bucket | mycompany-terraform-state-131696162455 | Versioned, KMS encrypted |
 | DynamoDB Table | mycompany-terraform-state-lock | State locking |
 | KMS Key | alias/mycompany-terraform-state | State file encryption |
 
@@ -712,7 +712,7 @@ git add -A && git commit -m "style: fix terraform formatting"
 ### Error 2: S3 Bucket does not exist
 
 ```
-Error: Failed to get existing workspaces: S3 bucket "mycompany-terraform-state-169588426347" does not exist
+Error: Failed to get existing workspaces: S3 bucket "mycompany-terraform-state-131696162455" does not exist
 ```
 
 **Cause:** Backend was never bootstrapped.

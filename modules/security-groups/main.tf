@@ -118,15 +118,6 @@ resource "aws_security_group" "eks_nodes" {
 }
 
 # Allow control plane to reach nodes
-resource "aws_security_group_rule" "cluster_to_nodes" {
-  type                     = "egress"
-  from_port                = 1025
-  to_port                  = 65535
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.eks_cluster.id
-  source_security_group_id = aws_security_group.eks_nodes.id
-  description              = "Control plane egress to worker nodes"
-}
 
 resource "aws_security_group_rule" "nodes_to_cluster" {
   type                     = "ingress"

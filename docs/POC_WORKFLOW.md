@@ -38,7 +38,7 @@ terraform apply \
   -var="aws_account_id=$(aws sts get-caller-identity --query Account --output text)"
 ```
 
-The bucket name `mycompany-terraform-state-169588426347` is already hardcoded in every environment's `versions.tf` — no further editing needed after the bucket is created.
+The bucket name `mycompany-terraform-state-131696162455` is already hardcoded in every environment's `versions.tf` — no further editing needed after the bucket is created.
 
 ---
 
