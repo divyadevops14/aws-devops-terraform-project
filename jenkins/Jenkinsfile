@@ -173,8 +173,23 @@ pipeline {
         stage('Terraform Destroy') {
             steps {
                 script {
-                    echo 'Terraform Destroy stage skipped intentionally.'
-                    echo 'AWS infrastructure will not be destroyed.'                    
+                    if (params.PLAN_ONLY) {
+                        echo 'PLAN_ONLY is set - nothing to destroy.'
+                    } else if (!params.DESTROY) {
+                        echo 'DESTROY not selected - nothing to destroy.'
+                    } else {
+                        dir(env.WORKING_DIR) {
+                            withCredentials([
+                                usernamePassword(
+                                    credentialsId: 'aws-creds',
+                                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                                )
+                            ]) {
+                                bat '"C:\\terraform\\terraform.exe" apply -input=false -auto-approve tfplan'
+                            }
+                        }
+                    }
                 }
             }
         }
