@@ -49,7 +49,6 @@ variable "endpoint_public_access" {
 variable "public_access_cidrs" {
   description = "CIDR blocks allowed to reach the public API endpoint (when enabled)"
   type        = list(string)
-  default     = ["0.0.0.0/0"]
 }
 
 variable "log_retention_days" {

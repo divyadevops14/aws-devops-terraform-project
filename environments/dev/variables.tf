@@ -16,7 +16,7 @@ variable "kubernetes_version" {
 variable "developer_cidrs" {
   description = "CIDR blocks allowed to reach the public EKS API endpoint. Restrict to your IP for security."
   type        = list(string)
-  default     = ["0.0.0.0/0"]
+  default     = ["152.59.201.224/32"]
 }
 
 variable "db_name" {
@@ -35,7 +35,10 @@ variable "db_password" {
   sensitive = true
 
   validation {
-    condition     = length(var.db_password) >= 8
-    error_message = "db_password must be at least 8 characters (RDS requirement)."
+    condition = (
+      length(var.db_password) >= 12 &&
+      can(regex("^[A-Za-z0-9!#$%&*+=?_.:-]+$", var.db_password))
+    )
+    error_message = "db_password must be at least 12 characters and contain only letters, digits, or the allowed symbols !#$%&*+=?_.:-."
   }
 }
