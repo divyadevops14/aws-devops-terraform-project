@@ -27,19 +27,19 @@ pipeline {
         choice(
             name: 'ENVIRONMENT',
             choices: ['dev', 'stage', 'prod'],
-            description: 'Target environment'
+            description: 'Select the Terraform environment'
+        )
+
+        booleanParam(
+            name: 'PLAN_ONLY',
+            defaultValue: false,
+            description: 'Only generate and review a Terraform plan'
         )
 
         booleanParam(
             name: 'DESTROY',
             defaultValue: false,
-            description: 'Generate a Terraform destroy plan'
-        )
-
-        booleanParam(
-            name: 'PLAN_ONLY',
-            defaultValue: true,
-            description: 'Plan only; do not apply or destroy resources'
+            description: 'Destroy infrastructure instead of applying changes'
         )
     }
 
