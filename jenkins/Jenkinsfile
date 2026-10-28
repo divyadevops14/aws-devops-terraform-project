@@ -1,23 +1,7 @@
 // =============================================================================
-// TERRAFORM CI/CD PIPELINE
-// =============================================================================
-// Branch strategy:
-//   feature/* → PR → develop → stage environment (auto-apply)
-//   develop   → PR → main    → prod environment  (manual-approval required)
-//
-// Required Jenkins credentials:
-//   AWS_ACCESS_KEY_ID     (Secret text)
-//   AWS_SECRET_ACCESS_KEY (Secret text)
-//   TF_VAR_db_password    (Secret text)
-//
-// Required Jenkins plugins:
-//   - Pipeline
-//   - AWS Credentials
-//   - AnsiColor
-//   - Slack Notification (optional)
-// =============================================================================
-// =============================================================================
 // TERRAFORM CI/CD PIPELINE - WINDOWS JENKINS
+// All stages always execute (none are skipped via `when`). Conditional logic
+// lives inside each stage, which logs what it did or why it took no action.
 // =============================================================================
 
 pipeline {
@@ -141,93 +125,82 @@ pipeline {
         }
 
         stage('Manual Approval') {
-            when {
-                expression {
-                    !params.PLAN_ONLY &&
-                    (
-                        params.ENVIRONMENT == 'stage' ||
-                        params.ENVIRONMENT == 'prod' ||
-                        params.DESTROY
-                    )
-                }
-            }
-
             steps {
-                timeout(time: 30, unit: 'MINUTES') {
-                    input(
-                        message: "Approve Terraform ${params.DESTROY ? 'DESTROY' : 'APPLY'} for ${params.ENVIRONMENT}?",
-                        ok: 'Approve'
-                    )
+                script {
+                    boolean needsApproval = !params.PLAN_ONLY &&
+                        (params.ENVIRONMENT == 'stage' || params.ENVIRONMENT == 'prod' || params.DESTROY)
+
+                    if (needsApproval) {
+                        timeout(time: 30, unit: 'MINUTES') {
+                            input(
+                                message: "Approve Terraform ${params.DESTROY ? 'DESTROY' : 'APPLY'} for ${params.ENVIRONMENT}?",
+                                ok: 'Approve'
+                            )
+                        }
+                    } else if (params.PLAN_ONLY) {
+                        echo 'PLAN_ONLY is set - no approval needed.'
+                    } else {
+                        echo "No manual approval required for ${params.ENVIRONMENT}."
+                    }
                 }
             }
         }
 
         stage('Terraform Apply') {
-            when {
-                expression {
-                    !params.PLAN_ONLY && !params.DESTROY
-                }
-            }
-
             steps {
-                dir(env.WORKING_DIR) {
-                    withCredentials([
-                        usernamePassword(
-                            credentialsId: 'aws-creds',
-                            usernameVariable: 'AWS_ACCESS_KEY_ID',
-                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                        )
-                    ]) {
-                        bat '"C:\\terraform\\terraform.exe" apply -input=false -auto-approve tfplan'
+                script {
+                    if (params.PLAN_ONLY) {
+                        echo 'PLAN_ONLY is set - nothing to apply.'
+                    } else if (params.DESTROY) {
+                        echo 'DESTROY is set - handled in the Terraform Destroy stage.'
+                    } else {
+                        dir(env.WORKING_DIR) {
+                            withCredentials([
+                                usernamePassword(
+                                    credentialsId: 'aws-creds',
+                                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                                )
+                            ]) {
+                                bat '"C:\\terraform\\terraform.exe" apply -input=false -auto-approve tfplan'
+                            }
+                        }
                     }
                 }
             }
         }
 
         stage('Terraform Destroy') {
-            when {
-                expression {
-                    !params.PLAN_ONLY && params.DESTROY
-                }
-            }
-
             steps {
-                dir(env.WORKING_DIR) {
-                    withCredentials([
-                        usernamePassword(
-                            credentialsId: 'aws-creds',
-                            usernameVariable: 'AWS_ACCESS_KEY_ID',
-                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                        )
-                    ]) {
-                        bat '"C:\\terraform\\terraform.exe" apply -destroy -input=false -auto-approve tfplan'
-                    }
+                script {
+                    echo 'Terraform Destroy stage skipped intentionally.'
+                    echo 'AWS infrastructure will not be destroyed.'                    
                 }
             }
         }
 
         stage('Post-Apply Outputs') {
-            when {
-                expression {
-                    !params.PLAN_ONLY && !params.DESTROY
-                }
-            }
-
             steps {
-                dir(env.WORKING_DIR) {
-                    withCredentials([
-                        usernamePassword(
-                            credentialsId: 'aws-creds',
-                            usernameVariable: 'AWS_ACCESS_KEY_ID',
-                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                        )
-                    ]) {
-                        bat '"C:\\terraform\\terraform.exe" output -json > terraform-outputs.json'
+                script {
+                    if (params.PLAN_ONLY || params.DESTROY) {
+                        echo 'No outputs to collect for plan-only or destroy runs.'
+                    } else {
+                        dir(env.WORKING_DIR) {
+                            withCredentials([
+                                usernamePassword(
+                                    credentialsId: 'aws-creds',
+                                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                                )
+                            ]) {
+                                bat '"C:\\terraform\\terraform.exe" output -json > terraform-outputs.json'
 
-                        archiveArtifacts(
-                            artifacts: 'terraform-outputs.json',
-                            fingerprint: true
-                        )
+                                archiveArtifacts(
+                                    artifacts: 'terraform-outputs.json',
+                                    fingerprint: true
+                                )
+                            }
+                        }
                     }
                 }
             }
